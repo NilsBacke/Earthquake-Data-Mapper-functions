@@ -84,6 +84,7 @@ async function getNotificationData(features, callback) {
     var lon = data.longitude;
     var token = data.token;
     var maxDist = data.maxDist;
+    var minMag = data.minMag;
 
     var sentESnap = await db.collection("sentEarthquakes").get();
     var sentEarthquakeCodes = [];
@@ -97,8 +98,12 @@ async function getNotificationData(features, callback) {
       var dist = getDistanceFromLatLon(lat, lon, g[1], g[0]);
       if (dist <= (maxDist == undefined ? 200 : maxDist)) {
         console.log("first if");
-        var bool = await hasNotBeenSentToToken(db, code, token);
-        if (!sentEarthquakeCodes.includes(code) && bool) {
+        var hasNotBeenSent = await hasNotBeenSentToToken(db, code, token);
+        if (
+          !sentEarthquakeCodes.includes(code) &&
+          hasNotBeenSent &&
+          feature.properties.mag >= minMag
+        ) {
           console.log("second if");
           if (hashmap[token] == undefined) {
             hashmap[token] = [];
