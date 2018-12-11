@@ -48,8 +48,9 @@ exports.five_min_tick = functions.pubsub
           title = "Multiple Earthquakes in Your Area";
         }
         var body = "";
-
-        for (var i = 0; i < listOfFeatures.length; i++) {
+        var numOfEarthquakesSent =
+          listOfFeatures.length > 5 ? 5 : listOfFeatures.length;
+        for (var i = 0; i < numOfEarthquakesSent; i++) {
           body +=
             listOfFeatures[i].properties.mag +
             " mag earthquake near " +
@@ -63,6 +64,20 @@ exports.five_min_tick = functions.pubsub
           notification: {
             title: title,
             body: body
+          },
+          android: {
+            ttl: 3600 * 1000,
+            notification: {
+              icon: "stock_ticker_update",
+              color: "#f45342"
+            }
+          },
+          apns: {
+            payload: {
+              aps: {
+                badge: 42
+              }
+            }
           },
           token: key
         };
@@ -97,14 +112,12 @@ async function getNotificationData(features, callback) {
       var code = feature.properties.code;
       var dist = getDistanceFromLatLon(lat, lon, g[1], g[0]);
       if (dist <= (maxDist == undefined ? 200 : maxDist)) {
-        console.log("first if");
         var hasNotBeenSent = await hasNotBeenSentToToken(db, code, token);
         if (
           !sentEarthquakeCodes.includes(code) &&
           hasNotBeenSent &&
           feature.properties.mag >= minMag
         ) {
-          console.log("second if");
           if (hashmap[token] == undefined) {
             hashmap[token] = [];
           }
@@ -122,7 +135,7 @@ function getEarthquakeData() {
   return new Promise(function(resolve) {
     axios
       .get(
-        "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/1.0_hour.geojson"
+        "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson"
       )
       .then(response => {
         var stringData = JSON.stringify(response.data);
@@ -157,7 +170,10 @@ function saveEarthquakeCode(db, code, token) {
     .doc(code)
     .collection("sentTo")
     .doc(token)
-    .set({ token: token });
+    .set({
+      token: token,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
 }
 
 async function hasNotBeenSentToToken(db, code, token) {
